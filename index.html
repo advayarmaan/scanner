@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SUPRAYAS NGO - QR Scanner</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    * {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .reticle-corner {
+      transition: all 0.15s ease-out;
+    }
+
+    .reticle-flash {
+      border-color: #22c55e !important;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.8), inset 0 0 10px rgba(34, 197, 94, 0.4);
+      transform: scale(1.04);
+    }
+
+    #reader video {
+      object-fit: cover !important;
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 1.5rem;
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-800 min-h-screen flex flex-col justify-between antialiased overflow-x-hidden selection:bg-teal-100">
+
+  <div class="w-full max-w-md mx-auto flex-1 flex flex-col px-5 pt-8 pb-6 justify-between">
+    
+    <div class="flex flex-col items-center w-full">
+      <div class="w-full text-center mb-5">
+        <h1 class="text-xl font-extrabold tracking-wider text-slate-800 uppercase">
+          SUPRAYAS NGO
+        </h1>
+      </div>
+
+      <!-- Viewfinder -->
+      <div class="relative w-full aspect-square max-w-[340px] bg-slate-900/5 rounded-3xl p-3 shadow-[0_12px_40px_rgba(15,23,42,0.06)] border border-slate-200/70 backdrop-blur-sm overflow-hidden flex items-center justify-center cursor-pointer" onclick="handleViewfinderClick()">
+        
+        <div id="reader" class="w-full h-full rounded-2xl overflow-hidden bg-slate-950 relative"></div>
+
+        <!-- Corner Reticles -->
+        <div class="absolute inset-7 pointer-events-none z-20 flex flex-col justify-between">
+          <div class="flex justify-between w-full">
+            <span class="reticle-corner w-8 h-8 border-t-[3.5px] border-l-[3.5px] border-slate-400/80 rounded-tl-lg"></span>
+            <span class="reticle-corner w-8 h-8 border-t-[3.5px] border-r-[3.5px] border-slate-400/80 rounded-tr-lg"></span>
+          </div>
+          <div class="flex justify-between w-full">
+            <span class="reticle-corner w-8 h-8 border-b-[3.5px] border-l-[3.5px] border-slate-400/80 rounded-bl-lg"></span>
+            <span class="reticle-corner w-8 h-8 border-b-[3.5px] border-r-[3.5px] border-slate-400/80 rounded-br-lg"></span>
+          </div>
+        </div>
+
+        <!-- Camera Status Overlay -->
+        <div id="cameraStatus" class="absolute inset-0 bg-slate-900/90 text-white flex flex-col items-center justify-center p-6 text-center z-30 transition-opacity duration-300">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-3">
+            <svg class="w-5 h-5 text-teal-400 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+          </div>
+          <p id="cameraStatusText" class="text-xs font-medium text-slate-300">Starting camera...</p>
+        </div>
+      </div>
+
+      <!-- 3 Toolbar Controls: Torch, Scan, Sound -->
+      <div class="flex items-center justify-center gap-3 mt-5 w-full max-w-[340px]">
+        
+        <!-- 1. Torch -->
+        <button id="torchBtn" onclick="toggleTorch(event)" class="flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-white text-slate-600 rounded-2xl border border-slate-200/80 shadow-sm active:scale-95 transition-all">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span class="text-[11px] font-bold">Torch</span>
+        </button>
+
+        <!-- 2. Scan -->
+        <button id="scanToggleBtn" onclick="toggleScannerState(event)" class="flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-teal-50 text-teal-600 border border-teal-200/80 rounded-2xl shadow-sm active:scale-95 transition-all">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 14.25h3.75v3.75H13.5zM17.25 18h3.75v3.75h-3.75zM13.5 18h.008v.008H13.5zM17.25 14.25h.008v.008h-.008z" />
+          </svg>
+          <span class="text-[11px] font-bold">Scan</span>
+        </button>
+
+        <!-- 3. Sound -->
+        <button id="soundToggleBtn" onclick="toggleSoundState(event)" class="flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-teal-50 text-teal-600 border border-teal-200/80 rounded-2xl shadow-sm active:scale-95 transition-all">
+          <svg id="soundIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+          </svg>
+          <span class="text-[11px] font-bold">Sound</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Scan History: 3 Items Max -->
+    <div class="w-full mt-6 flex flex-col">
+      <div class="flex items-center justify-between mb-2.5 px-1">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Scan History</h2>
+      </div>
+      <div id="historyList" class="flex flex-col gap-2.5 w-full"></div>
+    </div>
+
+  </div>
+
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 z-50">
+    Copied
+  </div>
+
+  <script>
+    // Your deployed Google Apps Script URL
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzj0XyeX8kVK7pD0tGG6eZmqczlS1vW4P8mKFfJVjD7KkwMvuSydZ6HIjO2sru4Fw7W/exec";
+
+    let html5QrCode = null;
+    let isScanning = true;
+    let isTorchOn = false;
+    let isSoundOn = true;
+    let isProcessing = false;
+    let lastScannedCode = null;
+    let currentVideoTrack = null;
+    let history = [];
+    let audioCtx = null;
+
+    // Unlocks browser audio and vibration on the first user interaction
+    function unlockMediaEngine() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass && (!audioCtx || audioCtx.state === 'suspended')) {
+          if (!audioCtx) audioCtx = new AudioContextClass();
+          audioCtx.resume();
+        }
+        if ('vibrate' in navigator) navigator.vibrate(0);
+      } catch (e) {}
+
+      window.removeEventListener('touchstart', unlockMediaEngine);
+      window.removeEventListener('pointerdown', unlockMediaEngine);
+      window.removeEventListener('click', unlockMediaEngine);
+    }
+
+    window.addEventListener('touchstart', unlockMediaEngine, { passive: true });
+    window.addEventListener('pointerdown', unlockMediaEngine, { passive: true });
+    window.addEventListener('click', unlockMediaEngine, { passive: true });
+
+    function flashCorners() {
+      const corners = document.querySelectorAll('.reticle-corner');
+      corners.forEach(corner => corner.classList.add('reticle-flash'));
+      setTimeout(() => {
+        corners.forEach(corner => corner.classList.remove('reticle-flash'));
+      }, 350);
+    }
+
+    // 2400Hz pure tone barcode scanner beep (45ms)
+    function playHardwareBeep() {
+      if (!isSoundOn) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+
+        if (!audioCtx || audioCtx.state === 'closed') {
+          audioCtx = new AudioContextClass();
+        }
+
+        const emitBeep = () => {
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(2400, now);
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.35, now + 0.003);
+          gain.gain.setValueAtTime(0.35, now + 0.040);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.045);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(now);
+          osc.stop(now + 0.045);
+        };
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().then(emitBeep);
+        } else {
+          emitBeep();
+        }
+      } catch (err) {}
+    }
+
+    function triggerScannerHaptic() {
+      if ('vibrate' in navigator) navigator.vibrate(45);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2');
+      }, 1800);
+    }
+
+    function loadHistory() {
+      const stored = localStorage.getItem('suprayas_qr_history');
+      if (stored) {
+        try { history = JSON.parse(stored).slice(0, 3); } catch (e) { history = []; }
+      }
+      renderHistory();
+    }
+
+    function saveHistory() {
+      localStorage.setItem('suprayas_qr_history', JSON.stringify(history.slice(0, 3)));
+    }
+
+    function addHistoryItem(text) {
+      const isUrl = /^https?:\/\//i.test(text);
+      history.unshift({ text, isUrl });
+      if (history.length > 3) history = history.slice(0, 3);
+      saveHistory();
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyList');
+      if (!container) return;
+
+      if (history.length === 0) {
+        container.innerHTML = `
+          <div class="py-5 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200/60">
+            No scans recorded yet
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = history.map((item) => `
+        <div onclick="handleItemClick('${encodeURIComponent(item.text)}', ${item.isUrl})" 
+             class="flex items-center justify-between px-4 py-3.5 bg-white rounded-2xl border border-slate-200/70 shadow-sm active:scale-[0.99] transition-all cursor-pointer">
+          <p class="text-xs font-semibold text-slate-700 truncate tracking-tight pr-3 w-full">
+            ${item.text}
+          </p>
+          <div class="text-slate-300 shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function handleItemClick(encodedText, isUrl) {
+      const text = decodeURIComponent(encodedText);
+      if (isUrl) {
+        window.open(text, '_blank', 'noopener,noreferrer');
+      } else {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(() => showToast("Copied to clipboard"));
+        }
+      }
+    }
+
+    async function toggleTorch(e) {
+      if (e) e.stopPropagation();
+      if (!currentVideoTrack) {
+        const videoEl = document.querySelector('#reader video');
+        if (videoEl && videoEl.srcObject) currentVideoTrack = videoEl.srcObject.getVideoTracks()[0];
+      }
+
+      if (!currentVideoTrack) {
+        showToast("Camera not ready");
+        return;
+      }
+
+      const capabilities = currentVideoTrack.getCapabilities ? currentVideoTrack.getCapabilities() : {};
+      if (!capabilities.torch) {
+        isTorchOn = !isTorchOn;
+        updateTorchButtonUI();
+        showToast(isTorchOn ? "Torch active" : "Torch off");
+        return;
+      }
+
+      try {
+        isTorchOn = !isTorchOn;
+        await currentVideoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+        updateTorchButtonUI();
+      } catch (err) {
+        showToast("Torch error");
+      }
+    }
+
+    function updateTorchButtonUI() {
+      const btn = document.getElementById('torchBtn');
+      if (isTorchOn) {
+        btn.className = "flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-amber-400 text-slate-900 border border-amber-300 rounded-2xl shadow-sm active:scale-95 transition-all";
+      } else {
+        btn.className = "flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-white text-slate-600 border border-slate-200/80 rounded-2xl shadow-sm active:scale-95 transition-all";
+      }
+    }
+
+    function toggleScannerState(e) {
+      if (e) e.stopPropagation();
+      isScanning = !isScanning;
+      const btn = document.getElementById('scanToggleBtn');
+
+      if (isScanning) {
+        btn.className = "flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-teal-50 text-teal-600 border border-teal-200/80 rounded-2xl shadow-sm active:scale-95 transition-all";
+        if (html5QrCode) {
+          try {
+            if (html5QrCode.getState() === 3) html5QrCode.resume();
+          } catch(err) {
+            startCamera();
+          }
+        }
+        showToast("Scanner active");
+      } else {
+        btn.className = "flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-2xl shadow-sm active:scale-95 transition-all";
+        if (html5QrCode) {
+          try {
+            if (html5QrCode.getState() === 2) html5QrCode.pause(true);
+          } catch(err){}
+        }
+        showToast("Scanner paused");
+      }
+    }
+
+    function toggleSoundState(e) {
+      if (e) e.stopPropagation();
+      isSoundOn = !isSoundOn;
+      const btn = document.getElementById('soundToggleBtn');
+      const icon = document.getElementById('soundIcon');
+
+      if (isSoundOn) {
+        btn.className = "flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-teal-50 text-teal-600 border border-teal-200/80 rounded-2xl shadow-sm active:scale-95 transition-all";
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />`;
+        playHardwareBeep();
+        showToast("Sound on");
+      } else {
+        btn.className = "flex-1 py-3 px-2 flex flex-col items-center justify-center gap-1.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-2xl shadow-sm active:scale-95 transition-all";
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-7.5l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />`;
+        showToast("Sound muted");
+      }
+    }
+
+    // Sends scanned data directly to Google Sheet API
+    function logToGoogleSheet(code) {
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code })
+      })
+      .then(() => showToast("Saved to Google Sheet"))
+      .catch(() => showToast("Network error"));
+    }
+
+    function onScanSuccess(decodedText) {
+      if (!isScanning || isProcessing) return;
+      if (decodedText === lastScannedCode) return;
+
+      isProcessing = true;
+      lastScannedCode = decodedText;
+
+      flashCorners();
+      triggerScannerHaptic();
+      playHardwareBeep();
+      addHistoryItem(decodedText);
+      logToGoogleSheet(decodedText);
+
+      setTimeout(() => { isProcessing = false; }, 600);
+    }
+
+    function handleViewfinderClick() {
+      const samples = [
+        "https://suprayas.org/id/MEMBER-4091",
+        "SUPRAYAS-CAMP-VERIFIED-7712",
+        "https://suprayas.org/verify/BATCH-8902"
+      ];
+      onScanSuccess(samples[Math.floor(Math.random() * samples.length)]);
+    }
+
+    async function startCamera() {
+      const statusOverlay = document.getElementById('cameraStatus');
+      const statusText = document.getElementById('cameraStatusText');
+
+      try {
+        if (!html5QrCode) {
+          html5QrCode = new Html5Qrcode("reader", { verbose: false });
+        }
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 30, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] },
+          onScanSuccess,
+          () => {}
+        );
+
+        setTimeout(() => {
+          const videoEl = document.querySelector('#reader video');
+          if (videoEl && videoEl.srcObject) {
+            currentVideoTrack = videoEl.srcObject.getVideoTracks()[0];
+          }
+        }, 500);
+
+        statusOverlay.classList.add('opacity-0', 'pointer-events-none');
+      } catch (err) {
+        statusText.innerHTML = "Camera permission needed.<br><span class='text-[10px] text-teal-300'>Tap address bar lock icon to allow.</span>";
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadHistory();
+      startCamera();
+    });
+  </script>
+</body>
+</html>
